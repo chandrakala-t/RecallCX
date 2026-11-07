@@ -162,6 +162,7 @@ async def chat(request: ChatRequest):
             status_code=502,
             detail="Customer memory service is unavailable."
         )
+    memory_used = bool(memory_context)
 
     # STEP 2: Generate a response using Groq and retrieved memories
     system_prompt = (
