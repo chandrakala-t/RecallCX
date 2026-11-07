@@ -133,13 +133,37 @@ async def chat(request: ChatRequest):
             if memory.text
         )
 
-    except Exception as error:
-        print("Hindsight recall error:", type(error).__name__)
+   except Exception as error:
+    status = getattr(error, "status", None)
 
-        raise HTTPException(
-            status_code=502,
-            detail="Customer memory service is unavailable."
-        )
+    if status is None:
+        status = getattr(error, "status_code", None)
+
+    body = getattr(error, "body", None)
+
+    safe_body = str(body) if body is not None else "No response body"
+
+    # Redact sensitive information
+    safe_body = re.sub(
+        r'(?i)(authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password)(\s*[:=]\s*)["\']?[^"\',}\s]+',
+        r'\1\2[REDACTED]',
+        safe_body
+    )
+
+    safe_body = re.sub(
+        r'(?i)Bearer\s+\S+',
+        'Bearer [REDACTED]',
+        safe_body
+    )
+
+    print("Hindsight recall error:", type(error).__name__)
+    print("Hindsight API status:", status)
+    print("Hindsight API response body:", safe_body)
+
+    raise HTTPException(
+        status_code=502,
+        detail="Customer memory service is unavailable."
+    )
 
     memory_used = bool(memory_context)
 
