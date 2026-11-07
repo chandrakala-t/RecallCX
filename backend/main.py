@@ -115,7 +115,7 @@ async def chat(request: ChatRequest):
     # Create a separate memory tag for each customer
     customer_tag = f"customer:{customer_id}"
 
-    # STEP 1: Retrieve this customer's previous memories
+        # STEP 1: Retrieve this customer's previous memories
     try:
         memory_result = await hindsight_client.arecall(
             bank_id=BANK_ID,
@@ -133,39 +133,35 @@ async def chat(request: ChatRequest):
             if memory.text
         )
 
-   except Exception as error:
-    status = getattr(error, "status", None)
+    except Exception as error:
+        status = getattr(error, "status", None)
 
-    if status is None:
-        status = getattr(error, "status_code", None)
+        if status is None:
+            status = getattr(error, "status_code", None)
 
-    body = getattr(error, "body", None)
+        body = getattr(error, "body", None)
+        safe_body = str(body) if body is not None else "No response body"
 
-    safe_body = str(body) if body is not None else "No response body"
+        safe_body = re.sub(
+            r'(?i)(authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password)(\s*[:=]\s*)["\']?[^"\',}\s]+',
+            r'\1\2[REDACTED]',
+            safe_body
+        )
 
-    # Redact sensitive information
-    safe_body = re.sub(
-        r'(?i)(authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password)(\s*[:=]\s*)["\']?[^"\',}\s]+',
-        r'\1\2[REDACTED]',
-        safe_body
-    )
+        safe_body = re.sub(
+            r'(?i)Bearer\s+\S+',
+            'Bearer [REDACTED]',
+            safe_body
+        )
 
-    safe_body = re.sub(
-        r'(?i)Bearer\s+\S+',
-        'Bearer [REDACTED]',
-        safe_body
-    )
+        print("Hindsight recall error:", type(error).__name__)
+        print("Hindsight API status:", status)
+        print("Hindsight API response body:", safe_body)
 
-    print("Hindsight recall error:", type(error).__name__)
-    print("Hindsight API status:", status)
-    print("Hindsight API response body:", safe_body)
-
-    raise HTTPException(
-        status_code=502,
-        detail="Customer memory service is unavailable."
-    )
-
-    memory_used = bool(memory_context)
+        raise HTTPException(
+            status_code=502,
+            detail="Customer memory service is unavailable."
+        )
 
     # STEP 2: Generate a response using Groq and retrieved memories
     system_prompt = (
