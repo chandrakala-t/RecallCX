@@ -1,19 +1,86 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 
 // Temporary API address.
 // Change this to your friend's accessible backend address later.
-const API_URL = 'https://recallcx-backend.onrender.com/chat'
+const API_BASE = 'https://recallcx-backend.onrender.com'
+const API_URL = `${API_BASE}/chat`
+const STORAGE_KEY = 'recallcx_conversations_v1'
+// Temporary sample conversation for every new customer.
+const INITIAL_SAMPLE_CONVERSATION = [
+  {
+    role: 'user',
+    text: 'My headphones stopped working after two days.',
+    time: 'Sample conversation'
+  }
+]
+
+function loadConversations() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+
+    if (saved !== null) {
+      const parsed = JSON.parse(saved)
+
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const cleaned = { ...parsed }
+
+        // Remove any previously saved sample messages.
+        Object.keys(cleaned).forEach((id) => {
+          if (Array.isArray(cleaned[id])) {
+            cleaned[id] = cleaned[id].filter(
+              (msg) =>
+                !(
+                  msg.text === 'My headphones stopped working after two days.' &&
+                  msg.time === 'Sample conversation'
+                )
+            )
+          }
+        })
+
+        return cleaned
+      }
+    }
+  } catch (err) {
+    console.error('Could not restore saved conversations:', err)
+  }
+
+  return {}
+}
+
 function App() {
-  const [customerId, setCustomerId] = useState('C101')
-  const [customerInput, setCustomerInput] = useState('C101')
+  const [customerId, setCustomerId] = useState(() => {
+  return localStorage.getItem('recallcx_active_customer') || 'C101'
+})
+
+const [customerInput, setCustomerInput] = useState(() => {
+  return localStorage.getItem('recallcx_active_customer') || 'C101'
+})
   const [message, setMessage] = useState('')
   const [page, setPage] = useState('support')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [conversations, setConversations] = useState({ C101: [] })
+  const [conversations, setConversations] = useState(loadConversations)
+useEffect(() => {
+  localStorage.setItem('recallcx_active_customer', customerId)
+}, [customerId])
 
   const currentMessages = conversations[customerId] || []
+
+const messagesToDisplay =
+  currentMessages.length === 0
+    ? INITIAL_SAMPLE_CONVERSATION
+    : currentMessages
+
+  // Save every customer's conversation whenever the conversation data changes.
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations))
+    } catch (err) {
+      console.error('Could not save conversations:', err)
+      setError('Conversation history could not be saved in this browser.')
+    }
+  }, [conversations])
 
   const selectCustomer = (e) => {
     e.preventDefault()
@@ -111,9 +178,8 @@ function App() {
 
   const renderMessages = () => (
     <>
-      {currentMessages.map((msg, index) => (
+      {messagesToDisplay.map((msg, index) => (
         <div className="message-row" key={index}>
-
           <div className="user-avatar">
             {msg.role === 'assistant' ? 'AI' : 'You'}
           </div>
@@ -135,7 +201,6 @@ function App() {
               </small>
             )}
           </div>
-
         </div>
       ))}
 
@@ -153,9 +218,7 @@ function App() {
 
   return (
     <div className="app">
-
       <aside className="sidebar">
-
         <h2 className="brand">
           Recall<span>CX</span>
         </h2>
@@ -188,13 +251,10 @@ function App() {
           Hindsight Memory
           <span>Backend integration testing</span>
         </div>
-
       </aside>
 
       <main className="main">
-
         <header className="topbar">
-
           <div>
             <h2>
               {page === 'support' && 'Customer Support'}
@@ -202,9 +262,7 @@ function App() {
               {page === 'memory' && 'Customer Memory'}
             </h2>
 
-            <p>
-              Intelligent support powered by persistent memory
-            </p>
+            <p>Intelligent support powered by persistent memory</p>
           </div>
 
           <form className="customer-box" onSubmit={selectCustomer}>
@@ -220,13 +278,10 @@ function App() {
               <button type="submit">Select</button>
             </div>
           </form>
-
         </header>
 
         {page === 'support' && (
-
           <section className="chat-container">
-
             <div className="chat-header">
               <div>
                 <h3>Support Conversation</h3>
@@ -237,11 +292,8 @@ function App() {
             </div>
 
             <div className="chat-body">
-
               {currentMessages.length === 0 && !isLoading ? (
-
                 <div className="welcome">
-
                   <div className="brain-icon">AI</div>
 
                   <h2>Welcome to RecallCX</h2>
@@ -265,11 +317,8 @@ function App() {
                       My headphones stopped working after two days.
                     </button>
                   </div>
-
                 </div>
-
               ) : renderMessages()}
-
             </div>
 
             {error && (
@@ -279,7 +328,6 @@ function App() {
             )}
 
             <form className="message-form" onSubmit={sendMessage}>
-
               <input
                 type="text"
                 placeholder="Type your message here..."
@@ -291,21 +339,17 @@ function App() {
               <button type="submit" disabled={isLoading || !message.trim()}>
                 {isLoading ? 'Sending...' : 'Send ↑'}
               </button>
-
             </form>
 
             <p className="disclaimer">
               AI replies are provided by the connected FastAPI backend.
               Memory usage depends on the backend response.
             </p>
-
           </section>
         )}
 
         {page === 'history' && (
-
           <section className="chat-container">
-
             <div className="chat-header">
               <div>
                 <h3>Conversation History</h3>
@@ -314,9 +358,7 @@ function App() {
             </div>
 
             <div className="chat-body">
-
               {currentMessages.length === 0 ? (
-
                 <div className="welcome">
                   <div className="brain-icon">History</div>
 
@@ -326,18 +368,13 @@ function App() {
                     No previous conversations found for {customerId}.
                   </p>
                 </div>
-
               ) : renderMessages()}
-
             </div>
-
           </section>
         )}
 
         {page === 'memory' && (
-
           <section className="chat-container">
-
             <div className="chat-header">
               <div>
                 <h3>Customer Memory</h3>
@@ -348,9 +385,7 @@ function App() {
             </div>
 
             <div className="chat-body">
-
               <div className="memory-card">
-
                 <div className="brain-icon">AI</div>
 
                 <h2>Customer Information</h2>
@@ -373,11 +408,8 @@ function App() {
                 <h3>Conversation Details</h3>
 
                 {currentMessages.length === 0 ? (
-
                   <p>No messages available for this customer.</p>
-
                 ) : (
-
                   currentMessages.map((msg, index) => (
                     <p key={index}>
                       <strong>
@@ -386,23 +418,17 @@ function App() {
                       {msg.text}
                     </p>
                   ))
-
                 )}
 
                 <p className="disclaimer">
                   This page displays the current frontend conversation.
                   Actual persistent memories must be retrieved through Hindsight.
                 </p>
-
               </div>
-
             </div>
-
           </section>
         )}
-
       </main>
-
     </div>
   )
 }
